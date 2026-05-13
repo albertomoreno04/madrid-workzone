@@ -1,0 +1,20 @@
+# MADTwin DVC pipeline.
+#
+# Phase 0 ships a single stage that re-runs the baseline metrics computation
+# from a SUMO output bundle. The pipeline will grow in Phase 1 to cover the
+# data ingestion, network build, and W-SPSA calibration stages.
+stages:
+
+  baseline_metrics:
+    desc: >-
+      Parse a SUMO run bundle into BaselineMetrics JSON. Inputs are the
+      summary.xml / tripinfo.xml / statistics.xml emitted by a SUMO run.
+    cmd: python -m scripts.analyze_baseline
+    deps:
+      - src/madrid_twin/eval/baseline.py
+      - scripts/analyze_baseline.py
+      - data/outputs/baseline/summary.xml
+      - data/outputs/baseline/tripinfo.xml
+    outs:
+      - data/outputs/baseline/baseline_metrics.json:
+          cache: false
