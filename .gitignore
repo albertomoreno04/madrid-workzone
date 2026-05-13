@@ -1,0 +1,37 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Data lake — versioned via DVC, not git.
+data/raw/
+data/interim/
+data/processed/
+data/artifacts/
+data/outputs/*
+!data/outputs/.gitkeep
+
+# Experiment tracking — local-only, never committed.
+mlruns/
+mlartifacts/
+mlruns.db
+mlruns.db-journal
+wandb/
+
+# Build / packaging.
+build/
+dist/
+*.egg-info/
+
+# Editor / IDE / OS.
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# pytest tmp dirs left behind by `tmp_path` fixtures.
+pytest-cache-files-*
