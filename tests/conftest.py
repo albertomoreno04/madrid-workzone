@@ -38,6 +38,41 @@ STATISTICS_XML = """\
 </statistics>
 """
 
+TRAFFIC_INTENSITY_SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<pms>
+  <pm>
+    <idelem>3501</idelem>
+    <fecha_hora>13/05/2026 08:30:00</fecha_hora>
+    <intensidad>1240</intensidad>
+    <ocupacion>12,5</ocupacion>
+    <carga>34</carga>
+    <st_intensidad>0</st_intensidad>
+  </pm>
+  <pm>
+    <idelem>3502</idelem>
+    <fecha_hora>13/05/2026 08:30:00</fecha_hora>
+    <intensidad>780</intensidad>
+    <ocupacion>7,2</ocupacion>
+    <carga>18</carga>
+    <st_intensidad>0</st_intensidad>
+  </pm>
+  <pm>
+    <idelem>3503</idelem>
+    <fecha_hora>13/05/2026 08:30:00</fecha_hora>
+    <intensidad></intensidad>
+    <ocupacion></ocupacion>
+    <carga></carga>
+    <st_intensidad>2</st_intensidad>
+  </pm>
+</pms>
+"""
+
+
+@pytest.fixture()
+def traffic_intensity_sample_xml() -> str:
+    """Shared XML payload mirroring the Ayuntamiento real-time feed."""
+    return TRAFFIC_INTENSITY_SAMPLE_XML
+
 
 @pytest.fixture()
 def sumo_outputs(tmp_path: Path) -> dict[str, Path]:
