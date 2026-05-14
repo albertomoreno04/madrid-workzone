@@ -22,38 +22,51 @@ of the architecture:
 |---|---|---|
 | `madrid_twin.data`    | Data & ground truth | Open-data ingestion (Madrid Ayuntamiento real-time intensity feed), workzone permits, census shapes. |
 | `madrid_twin.sim`     | Calibrated twin     | SUMO network build (`netconvert` wrapper), parametric workzone module, W-SPSA demand calibration, TraCI bridge. |
-| `madrid_twin.predict` | Predictive          | ST-GNN baselines + physics-informed variant + conformal uncertainty intervals. |
+| `madrid_twin.predict` | Predictive          | Road-graph features, ST-GNN baselines + physics-informed variant, conformal uncertainty intervals. |
 | `madrid_twin.control` | Control             | Heterogeneous MARL: signal, lane and VMS agents; robustness via domain randomization + RARL. |
 | `madrid_twin.eval`    | Evaluation          | Baseline metrics, GEH calibration validator, travel-time RMSE, ablations, robustness stress tests. |
 
 ## What works today
 
-The current surface, with everything tested in CI:
+Everything in this list is tested in CI.
 
-- **`madrid_twin.eval.baseline`** — parse a SUMO run bundle (`summary.xml`,
-  `tripinfo.xml`, `statistics.xml`) into a typed `BaselineMetrics` JSON
-  (delay, throughput, p95 travel time, spillback proxy).
-- **`madrid_twin.eval.validation`** — GEH statistic for calibration
-  validation, batch GEH, pass/fail report against the Wisconsin DOT
-  default thresholds (GEH<5 on ≥85% of detectors), plus travel-time RMSE.
-- **`madrid_twin.eval.tracking`** — thin MLflow run helper with consistent
-  phase + git-commit tagging. Lazy mlflow import keeps the package usable
-  without the dev extras.
-- **`madrid_twin.sim.workzone`** — a typed `Workzone` dataclass (id, lane
-  closures, schedule, capacity-drop %), with serialization and a SUMO
-  additional-file emitter that closes the affected lanes via
-  `<closingLaneReroute>`.
-- **`madrid_twin.sim.network`** — opinionated `netconvert` wrapper that
-  builds a clean SUMO `.net.xml` from OSM with sensible defaults
-  (geometry simplification, TLS import, junction joining, ramp guessing).
-- **`madrid_twin.data.open_data`** — typed httpx client for the
-  Ayuntamiento real-time intensity feed
-  (`https://informo.madrid.es/informo/tmadrid/pm.xml`): fetch, retry with
-  exponential backoff, optional on-disk cache, tolerant XML parser that
-  copes with Spanish decimals and missing fields.
-- **`madrid_twin.data.probe`** — one-shot smoke probe that hits the feed,
-  reports response time and payload size, samples three detector readings,
-  and writes a timestamped XML snapshot to `data/raw/traffic_intensity/`.
+**Evaluation layer.** `madrid_twin.eval.baseline` parses a SUMO run bundle
+into a typed `BaselineMetrics` JSON (delay, throughput, p95 travel time,
+spillback proxy). `madrid_twin.eval.validation` provides the GEH statistic
+plus a pass/fail report against Wisconsin DOT defaults (GEH<5 on ≥85% of
+detectors), and a travel-time RMSE helper. `madrid_twin.eval.tracking` is
+a thin MLflow run helper with consistent phase + git-commit tagging.
+
+**Simulation layer.** `madrid_twin.sim.workzone` is a typed `Workzone`
+dataclass (id, lane closures, schedule, capacity-drop %) with
+serialization and a SUMO additional-file emitter that closes affected
+lanes via `<closingLaneReroute>`. `madrid_twin.sim.network` is an
+opinionated `netconvert` wrapper that builds a clean SUMO `.net.xml`
+from OSM with sensible defaults.
+
+**Data layer.** `madrid_twin.data.open_data` is a typed httpx client for
+the Ayuntamiento real-time intensity feed
+(`https://informo.madrid.es/informo/tmadrid/pm.xml`) with retry,
+on-disk caching, and a tolerant XML parser. `madrid_twin.data.probe` is
+a one-shot smoke probe (also wired as the `make probe` target and the
+`probe_traffic_intensity` DVC stage).
+
+**Predictive layer.** `madrid_twin.predict.features` parses a SUMO
+`.net.xml` into a `RoadGraph` and builds binary, distance-weighted, or
+travel-time-weighted adjacency matrices (the DCRNN convention).
+`madrid_twin.predict.baselines` defines the `Forecaster` protocol and a
+`ForecastBundle` return type, with three classical baselines —
+`HistoricalAverage`, `NaiveLastValue`, and `AR1Forecaster` — that
+together cover the non-deep references every ST-GNN paper compares
+against. `madrid_twin.predict.physics` implements the LWR conservation
+residual as a pure-numpy reference (it will be wrapped as a torch loss
+in Phase 3). `madrid_twin.predict.conformal` is a split-conformal
+wrapper that turns any `Forecaster` into one with coverage-guaranteed
+intervals — supports per-(horizon, node) calibration to handle the
+strong heteroskedasticity of urban traffic. `madrid_twin.predict.stgnn`
+locks in the ST-GNN interface (`STGNNConfig`, `load_stgnn`) with
+torch as a lazy import — the actual DCRNN / GraphWaveNet / PI-GraphWaveNet
+classes land in Phase 3 against real trajectories.
 
 ## Repository layout
 
@@ -66,40 +79,26 @@ madrid-workzone/
 ├── .github/workflows/ci.yml     # Ruff + mypy + pytest on every PR
 ├── .dvc/                        # DVC config (data versioning)
 ├── dvc.yaml                     # DVC pipeline stages
-├── data/
-│   ├── external/osm/            # OSM extract of the Madrid corridor
-│   ├── raw/                     # DVC-tracked raw open-data pulls
-│   ├── interim/                 # DVC-tracked intermediate artefacts
-│   ├── processed/               # DVC-tracked processed inputs
-│   └── outputs/                 # SUMO run outputs and metrics
+├── data/                        # raw / interim / processed / external / outputs
 ├── scripts/
-│   ├── analyze_baseline.py      # CLI: compute baseline metrics from SUMO outputs
-│   └── probe_open_data.py       # CLI: smoke-probe the Madrid open-data feed
+│   ├── analyze_baseline.py      # SUMO outputs -> BaselineMetrics JSON
+│   ├── probe_open_data.py       # Madrid open-data smoke probe
+│   └── fit_baselines.py         # Fit Phase 2 forecaster baselines, report MAE + conformal coverage
 ├── src/madrid_twin/
-│   ├── __init__.py
 │   ├── config.py                # Central paths, MLflow URI, SUMO version pin
-│   ├── data/
-│   │   ├── open_data.py         # Madrid Ayuntamiento traffic intensity client
-│   │   └── probe.py             # Open-data smoke probe
-│   ├── sim/
-│   │   ├── network.py           # netconvert wrapper (OSM -> SUMO net.xml)
-│   │   └── workzone.py          # Parametric workzone descriptor
-│   ├── predict/                 # ST-GNN + conformal uncertainty (planned)
-│   ├── control/                 # MARL controller (planned)
-│   └── eval/
-│       ├── baseline.py          # SUMO output bundle -> BaselineMetrics
-│       ├── validation.py        # GEH + travel-time RMSE
-│       └── tracking.py          # MLflow run helper
-└── tests/                       # pytest suite
+│   ├── data/                    # open_data, probe
+│   ├── sim/                     # network, workzone
+│   ├── predict/                 # features, baselines, physics, conformal, stgnn
+│   ├── control/                 # MARL controller (Phase 3)
+│   └── eval/                    # baseline, validation, tracking
+└── tests/                       # pytest suite (119 tests as of Phase 2)
 ```
 
 ## Quickstart
 
 ### 1. Python environment
 
-The project requires **Python 3.11** (pinned in `.python-version`). If you
-use `pyenv` it will pick this up automatically; otherwise install Python
-3.11 from python.org or your system package manager.
+The project requires **Python 3.11** (pinned in `.python-version`).
 
 ```bash
 python -m venv .venv
@@ -110,103 +109,85 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e ".[dev,eval]"
 ```
 
-Verify the install:
+Verify:
 
 ```bash
-python -m pytest -q          # should print N passed (currently 60+)
+python -m pytest -q          # should print "119 passed"
 python -m ruff check src scripts tests
 python -m mypy src
 ```
 
 On Linux/macOS (or Git Bash on Windows) `make check` collapses all three.
 
-### 2. Hit the Madrid open-data feed (no SUMO needed)
+### 2. Phase 2 entry point: fit the forecaster baselines on synthetic data
+
+```bash
+make fit-baselines
+```
+
+Runs `scripts/fit_baselines.py`, fits Historical Average / Naive / AR(1),
+attaches conformal intervals at 90% nominal coverage, evaluates on a
+held-out split and writes `data/outputs/predict/baselines_report.json`.
+Useful as a smoke check and as a reference call site for the real
+calibration loop that will land once Phase 1 emits trajectories.
+
+### 3. Phase 1 entry point: hit the Madrid open-data feed
 
 ```bash
 make probe
 ```
 
-That runs `scripts/probe_open_data.py`, which fetches the Ayuntamiento
-real-time intensity XML, prints a structured report (URL, elapsed time,
-payload size, detector counts), shows three sample readings, and saves a
-timestamped snapshot under `data/raw/traffic_intensity/`.
+Fetches the Ayuntamiento real-time intensity XML, prints a structured
+report, and saves a timestamped snapshot under
+`data/raw/traffic_intensity/`.
 
-### 3. SUMO 1.20.0 (only needed for simulation work)
+### 4. SUMO 1.20.0 (only needed for simulation work)
 
-The codebase pins SUMO **1.20.0** (`madrid_twin.config.SUMO_VERSION`).
-Install it natively on your platform:
+Pinned in `madrid_twin.config.SUMO_VERSION`. Install natively:
 
-**Ubuntu / Debian.** Use the official Eclipse SUMO PPA:
+- **Ubuntu/Debian:** `sudo add-apt-repository ppa:sumo/stable && sudo apt-get install sumo=1.20.0* sumo-tools=1.20.0*`. Then `export SUMO_HOME=/usr/share/sumo`.
+- **macOS:** `brew tap dlr-ts/sumo && brew install sumo`. Then `export SUMO_HOME=/opt/homebrew/opt/sumo/share/sumo`.
+- **Windows:** download the 1.20.0 installer from <https://eclipse.dev/sumo/>, set `SUMO_HOME`, add `%SUMO_HOME%\bin` and `%SUMO_HOME%\tools` to PATH.
 
-```bash
-sudo add-apt-repository ppa:sumo/stable
-sudo apt-get update
-sudo apt-get install sumo=1.20.0* sumo-tools=1.20.0* sumo-doc=1.20.0*
-echo 'export SUMO_HOME=/usr/share/sumo' >> ~/.bashrc
-```
+Then `pip install -e ".[sim]"` for the Python bindings.
 
-**macOS.** Via Homebrew (verify the version):
+### 5. Heavier extras
 
 ```bash
-brew tap dlr-ts/sumo
-brew install sumo
-echo 'export SUMO_HOME=/opt/homebrew/opt/sumo/share/sumo' >> ~/.zshrc
+pip install -e ".[predict]"   # torch + torch-geometric-temporal + MAPIE  (for Phase 3 ST-GNN models)
+pip install -e ".[control]"   # gymnasium + PettingZoo + RLlib            (for Phase 3 MARL training)
+pip install -e ".[data]"      # geopandas + shapely                       (zone-level equity analysis)
 ```
 
-**Windows.** Download the official 1.20.0 installer from
-<https://eclipse.dev/sumo/>, run it, and add the install dir to
-`SUMO_HOME` plus `%SUMO_HOME%\bin` and `%SUMO_HOME%\tools` to `PATH`.
-
-Then install the Python bindings:
+### 6. Experiment tracking
 
 ```bash
-python -m pip install -e ".[sim]"
+make mlflow-ui     # local MLflow UI on http://localhost:5000
 ```
 
-> Note: `libsumo` (the fast in-process binding) is gated to non-Windows in
-> `pyproject.toml` because upstream does not ship Windows wheels. On Windows
-> you get `traci` + `sumolib`, which are sufficient for everything here.
-
-### 4. Heavier extras (install only when you need them)
-
-```bash
-pip install -e ".[predict]"   # torch + torch-geometric-temporal + MAPIE
-pip install -e ".[control]"   # gymnasium + PettingZoo + RLlib
-pip install -e ".[data]"      # geopandas + shapely (zone analysis)
-```
-
-### 5. Experiment tracking (MLflow, local, no services)
-
-The default tracking URI is a project-local SQLite file
-(`sqlite:///mlruns.db`), with artefacts under `./mlartifacts/`.
-
-```bash
-make mlflow-ui     # launches MLflow UI on http://localhost:5000
-```
-
-Override the location via `MLFLOW_TRACKING_URI` / `MLFLOW_ARTIFACT_ROOT`
-env vars — `madrid_twin.config` honours them.
+Default tracking URI: `sqlite:///mlruns.db`. Override via
+`MLFLOW_TRACKING_URI` / `MLFLOW_ARTIFACT_ROOT` env vars
+(`madrid_twin.config` honours them).
 
 ## Reproducibility expectations
 
-- **Pinned Python**: 3.11 via `.python-version` and the `requires-python`
-  field in `pyproject.toml`.
-- **Pinned SUMO**: 1.20.0, declared in `madrid_twin.config.SUMO_VERSION`
-  and documented in the install steps above.
-- **Dependency pins**: bounded versions in `pyproject.toml`. Heavy
-  optional groups (`predict`, `control`) keep CI lean.
+- **Pinned Python**: 3.11 via `.python-version` and `requires-python`.
+- **Pinned SUMO**: 1.20.0 in `madrid_twin.config.SUMO_VERSION`.
+- **Dependency pins**: bounded versions in `pyproject.toml`; heavy
+  groups (`predict`, `control`) kept optional so CI stays lean.
 - **Data versioning**: DVC tracks `data/raw`, `data/interim`,
-  `data/processed`. Outputs live in `data/outputs/`. Pipeline stages in
-  `dvc.yaml`.
-- **Experiment tracking**: MLflow, SQLite-backed locally. Runs tagged
+  `data/processed`. Outputs land in `data/outputs/`.
+- **Experiment tracking**: MLflow, SQLite-backed locally; runs tagged
   with phase + git commit via `madrid_twin.eval.tracking.start_run`.
-- **Quality gates**: Ruff (lint + format), mypy, pytest, enforced in CI.
-- **Pre-commit hooks**: `make precommit` installs them.
+- **Quality gates**: Ruff (lint + format), mypy, pytest enforced in CI.
 
 ## Status
 
-Repository scaffolding and the first calibration-validation tooling
-(GEH, parametric workzones, Madrid open-data ingestion, OSM-to-SUMO
-network build) are in place. Next up: W-SPSA demand calibration on the
-expanded M-30 network, and the SUMO scenario runner that closes the loop
-between control actions and detector observations.
+Phase 0 (scaffolding), Phase 1 (calibration validators + Madrid
+open-data ingestion + parametric workzone + OSM-to-SUMO build) and
+Phase 2 (road-graph features + classical forecaster baselines +
+LWR conservation residual + split-conformal intervals + ST-GNN
+interface skeleton) are complete. Next up: Phase 3 — heterogeneous
+MARL controller training against the calibrated twin, with the
+torch-backed ST-GNN models (DCRNN, GraphWaveNet, PI-GraphWaveNet)
+plugging into the predict.stgnn factory.

@@ -34,3 +34,18 @@ stages:
       - data/raw/traffic_intensity:
           cache: false
           persist: true
+
+  fit_baselines:
+    desc: >-
+      Fit the classical forecaster baselines (HA / NaiveLastValue / AR1)
+      on a held-out training split and report point-forecast metrics on
+      a validation split. Phase 2 predictive-layer entry point.
+    cmd: python -m scripts.fit_baselines
+    deps:
+      - src/madrid_twin/predict/baselines.py
+      - src/madrid_twin/predict/features.py
+      - src/madrid_twin/predict/conformal.py
+      - scripts/fit_baselines.py
+    outs:
+      - data/outputs/predict/baselines_report.json:
+          cache: false
