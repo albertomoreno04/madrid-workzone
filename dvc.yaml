@@ -1,8 +1,8 @@
 # MADTwin DVC pipeline.
 #
-# Phase 0 ships a single stage that re-runs the baseline metrics computation
-# from a SUMO output bundle. The pipeline will grow in Phase 1 to cover the
-# data ingestion, network build, and W-SPSA calibration stages.
+# Stages are run via ``dvc repro <stage>``. Each stage declares its
+# dependencies and outputs so the pipeline only re-runs when something
+# upstream changes.
 stages:
 
   baseline_metrics:
@@ -18,3 +18,19 @@ stages:
     outs:
       - data/outputs/baseline/baseline_metrics.json:
           cache: false
+
+  probe_traffic_intensity:
+    desc: >-
+      One-shot probe of the Madrid Ayuntamiento real-time traffic
+      intensity feed. Writes a timestamped XML snapshot under
+      data/raw/traffic_intensity/ for inspection.
+    cmd: python -m scripts.probe_open_data
+    deps:
+      - src/madrid_twin/data/open_data.py
+      - src/madrid_twin/data/probe.py
+      - scripts/probe_open_data.py
+    always_changed: true
+    outs:
+      - data/raw/traffic_intensity:
+          cache: false
+          persist: true

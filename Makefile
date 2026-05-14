@@ -80,6 +80,10 @@ check: lint typecheck test ## Full pre-flight check.
 baseline-metrics: ## Compute baseline metrics from a SUMO output bundle.
 	$(PYTHON) -m scripts.analyze_baseline
 
+.PHONY: probe
+probe: ## Hit the Madrid Ayuntamiento traffic intensity feed; save a snapshot.
+	$(PYTHON) -m scripts.probe_open_data
+
 # ---------------------------------------------------------------------------
 # Experiment tracking (local MLflow, project-local SQLite store)
 # ---------------------------------------------------------------------------
