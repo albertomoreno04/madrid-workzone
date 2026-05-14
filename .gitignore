@@ -35,3 +35,6 @@ Thumbs.db
 
 # pytest tmp dirs left behind by `tmp_path` fixtures.
 pytest-cache-files-*
+
+# Internal planning doc — kept locally as a working document, NEVER committed.
+PROJECT_PLAN.md

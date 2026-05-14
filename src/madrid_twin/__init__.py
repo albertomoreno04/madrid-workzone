@@ -15,8 +15,6 @@ into four subpackages that map one-to-one to the layers of the architecture:
                           randomization and adversarial demand perturbation.
 - ``madrid_twin.eval``    Evaluation harness: baseline metrics, ablations,
                           robustness stress tests, statistical analysis.
-
-See PROJECT_PLAN.md at the repo root for the full research plan.
 """
 
 from __future__ import annotations
