@@ -1,30 +1,48 @@
-"""Predictive layer — short-horizon spatiotemporal forecasting.
-
-Responsibilities
-----------------
-
-Given a stream of network state (detector counts, queues, link travel
-times) plus the workzone descriptor, forecast queue length, spillback
-probability, and link travel time at 5/15/30-minute horizons. Provide
-distribution-free uncertainty intervals via split conformal prediction.
-
-Contract
---------
-
-A predictor is a Python protocol with two methods, ``fit(train_data)``
-and ``predict(state) -> ForecastBundle``. ``ForecastBundle`` carries the
-point forecast plus calibrated lower/upper conformal bounds. Predictors
-are persisted as artefacts and tracked in MLflow.
-
-Submodules (planned)
---------------------
-
-- ``baselines``  DCRNN, GraphWaveNet, AGCRN, STAEformer wrappers.
-- ``pignn``      Physics-informed GNN with LWR conservation residual.
-- ``conformal``  Split-conformal prediction calibration utilities.
-- ``features``   Graph construction from the SUMO network + detector map.
-"""
+"""Predictive layer — short-horizon spatiotemporal forecasting."""
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from madrid_twin.predict.baselines import (
+    AR1Forecaster,
+    ForecastBundle,
+    Forecaster,
+    HistoricalAverage,
+    NaiveLastValue,
+)
+from madrid_twin.predict.conformal import SplitConformalPredictor
+from madrid_twin.predict.features import (
+    AdjacencyKind,
+    RoadEdge,
+    RoadGraph,
+    adjacency_matrix,
+    detector_to_node_indices,
+    parse_sumo_network,
+)
+from madrid_twin.predict.physics import lwr_residual, lwr_residual_loss
+from madrid_twin.predict.stgnn import (
+    STGNNConfig,
+    STGNNModel,
+    STGNNNotInstalledError,
+    load_stgnn,
+)
+
+__all__ = [
+    "AR1Forecaster",
+    "AdjacencyKind",
+    "ForecastBundle",
+    "Forecaster",
+    "HistoricalAverage",
+    "NaiveLastValue",
+    "RoadEdge",
+    "RoadGraph",
+    "STGNNConfig",
+    "STGNNModel",
+    "STGNNNotInstalledError",
+    "SplitConformalPredictor",
+    "adjacency_matrix",
+    "detector_to_node_indices",
+    "load_stgnn",
+    "lwr_residual",
+    "lwr_residual_loss",
+    "parse_sumo_network",
+]
