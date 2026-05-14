@@ -1,22 +1,4 @@
-"""Evaluation layer — baselines, ablations, robustness, statistics.
-
-Responsibilities
-----------------
-
-Compute headline metrics from SUMO outputs (delay, throughput, p95
-travel time, spillback proxy, emissions, equity Gini), run the
-ablation programme, drive robustness stress tests (demand shift,
-capacity-drop misestimation, sensor dropout), and produce
-publication-ready statistics with paired bootstrap CIs, Wilcoxon
-signed-rank tests, and Sobol total-order sensitivity indices.
-
-Submodules
-----------
-
-- ``baseline``   Parse a SUMO run bundle into a structured metrics object
-                 (refactored from the original ``scripts/analyze_baseline.py``).
-- (planned) ``equity``, ``robustness``, ``stats``, ``sensitivity``.
-"""
+"""Evaluation layer — baselines, ablations, robustness, statistics."""
 
 from __future__ import annotations
 
@@ -27,11 +9,29 @@ from madrid_twin.eval.baseline import (
     parse_summary,
     parse_tripinfo,
 )
+from madrid_twin.eval.validation import (
+    DEFAULT_GEH_PASS_RATE,
+    DEFAULT_GEH_THRESHOLD,
+    DetectorPair,
+    GEHReport,
+    geh,
+    geh_batch,
+    geh_pass_rate,
+    travel_time_rmse,
+)
 
 __all__ = [
+    "DEFAULT_GEH_PASS_RATE",
+    "DEFAULT_GEH_THRESHOLD",
     "BaselineMetrics",
+    "DetectorPair",
+    "GEHReport",
     "compute_baseline_metrics",
+    "geh",
+    "geh_batch",
+    "geh_pass_rate",
     "parse_statistics",
     "parse_summary",
     "parse_tripinfo",
+    "travel_time_rmse",
 ]
