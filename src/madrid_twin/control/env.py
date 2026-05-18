@@ -1,20 +1,17 @@
-"""PettingZoo ``ParallelEnv`` wrapping a mock queue scenario.
+"""PettingZoo ``ParallelEnv`` over a Scenario protocol.
 
-Phase 3 ships the *environment skeleton* — observation/action spaces,
-step/reset semantics, reward dispatch — over a deterministic mock
-network. The real SUMO-backed scenario plugs into the same
-:class:`MockQueueScenario` abstraction in Phase 4, when Phase 1's
-calibrated twin is producing trajectories.
-
-PettingZoo + Gymnasium are lazy-imported so the module is inspectable
-without the [control] extras.
+Phase 3 shipped this with a hard-coded :class:`MockQueueScenario`. Phase 4
+generalises it to a small structural ``Scenario`` protocol — anything
+exposing ``reset() / step(phases) -> NetworkState / intersection_states()``
+satisfies it, so the env wraps either the mock or the real SUMO runner
+transparently.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -25,6 +22,20 @@ from madrid_twin.control.spaces import (
     build_action_space,
     build_observation_space,
 )
+
+
+class Scenario(Protocol):
+    """Structural protocol any scenario backend must satisfy.
+
+    ``MockQueueScenario`` (mock) and ``SUMOScenarioRunner`` (real) both
+    satisfy this — the env consumes them interchangeably.
+    """
+
+    n_intersections: int
+
+    def reset(self) -> None: ...
+    def step(self, phase_per_intersection: Sequence[int]) -> NetworkState: ...
+    def intersection_states(self) -> list[IntersectionState]: ...
 
 
 @dataclass
@@ -104,13 +115,13 @@ class MockQueueScenario:
 
 
 def build_parallel_env(
-    scenario: MockQueueScenario,
+    scenario: Scenario,
     agent_specs: Sequence[AgentSpec],
     reward_config: RewardConfig | None = None,
     *,
     max_steps: int = 720,
 ) -> Any:
-    """Construct a PettingZoo ``ParallelEnv`` over a scenario + agent set."""
+    """Construct a PettingZoo ``ParallelEnv`` over any Scenario backend."""
     try:
         from pettingzoo import ParallelEnv
     except ImportError as exc:
@@ -137,10 +148,12 @@ def build_parallel_env(
             self.action_spaces = {s.agent_id: build_action_space(s.n_actions) for s in specs}
             self._scenario = scenario
             self._step = 0
+            self._last_state: NetworkState | None = None
 
         def reset(self, seed=None, options=None):
             self._scenario.reset()
             self._step = 0
+            self._last_state = None
             self.agents = list(self.possible_agents)
             obs = {a: self._obs_for(a) for a in self.agents}
             return obs, {a: {} for a in self.agents}
@@ -153,6 +166,7 @@ def build_parallel_env(
                 phases.append(0)
 
             state = self._scenario.step(phases[: scenario.n_intersections])
+            self._last_state = state
             reward = composite_reward(state, cfg)
 
             self._step += 1
@@ -174,11 +188,11 @@ def build_parallel_env(
             spec = next(s for s in specs if s.agent_id == agent_id)
             dim = self.observation_spaces[agent_id].shape[0]
             obs = np.zeros(dim, dtype=np.float32)
-            if spec.agent_class == "signal":
-                idx = self.possible_agents.index(agent_id) % scenario.n_intersections
-                if self._scenario._queues is not None:
-                    q = self._scenario._queues[idx]
-                    obs[: q.size] = q[:dim]
+            if spec.agent_class == "signal" and self._last_state is not None:
+                # Use the last observed queue lengths as a generic feature.
+                ql = self._last_state.queue_lengths_m
+                if ql.size > 0:
+                    obs[: min(dim, ql.size)] = ql[: min(dim, ql.size)]
             return obs
 
     return MadridParallelEnv()
@@ -186,5 +200,6 @@ def build_parallel_env(
 
 __all__ = [
     "MockQueueScenario",
+    "Scenario",
     "build_parallel_env",
 ]
