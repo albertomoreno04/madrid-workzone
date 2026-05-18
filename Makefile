@@ -64,8 +64,12 @@ probe: ## Hit the Madrid Ayuntamiento traffic intensity feed; save a snapshot.
 	$(PYTHON) -m scripts.probe_open_data
 
 .PHONY: fit-baselines
-fit-baselines: ## Fit the Phase 2 forecaster baselines on synthetic data and write a report.
+fit-baselines: ## Phase 2: fit forecaster baselines on synthetic data; write a report.
 	$(PYTHON) -m scripts.fit_baselines
+
+.PHONY: smoke-control
+smoke-control: ## Phase 3: roll out baselines on the mock queue env; write a smoke report.
+	$(PYTHON) -m scripts.smoke_control
 
 .PHONY: mlflow-ui
 mlflow-ui: ## Launch the local MLflow UI on http://localhost:5000.

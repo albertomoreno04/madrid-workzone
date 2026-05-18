@@ -1,14 +1,9 @@
 # MADTwin DVC pipeline.
-#
-# Stages are run via ``dvc repro <stage>``. Each stage declares its
-# dependencies and outputs so the pipeline only re-runs when something
-# upstream changes.
 stages:
 
   baseline_metrics:
     desc: >-
-      Parse a SUMO run bundle into BaselineMetrics JSON. Inputs are the
-      summary.xml / tripinfo.xml / statistics.xml emitted by a SUMO run.
+      Parse a SUMO run bundle into BaselineMetrics JSON.
     cmd: python -m scripts.analyze_baseline
     deps:
       - src/madrid_twin/eval/baseline.py
@@ -22,8 +17,7 @@ stages:
   probe_traffic_intensity:
     desc: >-
       One-shot probe of the Madrid Ayuntamiento real-time traffic
-      intensity feed. Writes a timestamped XML snapshot under
-      data/raw/traffic_intensity/ for inspection.
+      intensity feed.
     cmd: python -m scripts.probe_open_data
     deps:
       - src/madrid_twin/data/open_data.py
@@ -37,9 +31,8 @@ stages:
 
   fit_baselines:
     desc: >-
-      Fit the classical forecaster baselines (HA / NaiveLastValue / AR1)
-      on a held-out training split and report point-forecast metrics on
-      a validation split. Phase 2 predictive-layer entry point.
+      Phase 2: fit classical forecaster baselines (HA / NaiveLastValue / AR1)
+      on synthetic data, report point-forecast metrics + conformal coverage.
     cmd: python -m scripts.fit_baselines
     deps:
       - src/madrid_twin/predict/baselines.py
@@ -48,4 +41,19 @@ stages:
       - scripts/fit_baselines.py
     outs:
       - data/outputs/predict/baselines_report.json:
+          cache: false
+
+  smoke_control:
+    desc: >-
+      Phase 3 smoke: roll out the mock queue scenario with fixed-time +
+      max-pressure baselines under the composite reward; report mean
+      reward per episode. Pure numpy — no SUMO, no MARL deps.
+    cmd: python -m scripts.smoke_control
+    deps:
+      - src/madrid_twin/control/baselines.py
+      - src/madrid_twin/control/rewards.py
+      - src/madrid_twin/control/env.py
+      - scripts/smoke_control.py
+    outs:
+      - data/outputs/control/smoke_report.json:
           cache: false
