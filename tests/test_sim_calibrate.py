@@ -37,7 +37,9 @@ class TestCountMatchingLoss:
 
     def test_negative_weights_raise(self) -> None:
         with pytest.raises(ValueError):
-            count_matching_loss(np.zeros(2), np.zeros(2), weights=np.array([1.0, -1.0]))
+            count_matching_loss(
+                np.zeros(2), np.zeros(2), weights=np.array([1.0, -1.0])
+            )
 
 
 class TestWSPSAConfig:
@@ -63,13 +65,15 @@ class TestWSPSA:
         # Final loss must be substantially below initial loss.
         assert report.final_loss < 0.5 * report.initial_loss
         # We should have moved meaningfully toward the target.
-        assert float(np.linalg.norm(theta_star - target)) < float(np.linalg.norm(theta0 - target))
+        assert float(np.linalg.norm(theta_star - target)) < float(
+            np.linalg.norm(theta0 - target)
+        )
 
     def test_records_trace(self) -> None:
         target = np.array([1.0])
 
         def loss(t: np.ndarray) -> float:
-            return float((t - target) ** 2)
+            return float(((t - target) ** 2).sum())
 
         cfg = WSPSAConfig(max_iter=5, seed=1)
         _, report = wspsa(np.zeros(1), loss, cfg)
@@ -86,7 +90,7 @@ class TestWSPSA:
         target = np.array([10.0])
 
         def loss(t: np.ndarray) -> float:
-            return float((t - target) ** 2)
+            return float(((t - target) ** 2).sum())
 
         cfg = WSPSAConfig(max_iter=50, seed=2)
         theta_tiny, _ = wspsa(np.zeros(1), loss, cfg, weights=np.array([1e-6]))
@@ -97,7 +101,7 @@ class TestWSPSA:
         target = np.array([-5.0])
 
         def loss(t: np.ndarray) -> float:
-            return float((t - target) ** 2)
+            return float(((t - target) ** 2).sum())
 
         cfg = WSPSAConfig(max_iter=50, min_value=0.0, seed=3)
         theta_star, _ = wspsa(np.array([2.0]), loss, cfg)
