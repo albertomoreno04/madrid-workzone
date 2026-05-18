@@ -104,9 +104,11 @@ ignore = ["PLR0913", "PLR0915", "PLR2004"]
 "tests/*" = ["PLR2004", "S101", "PLC0415"]
 "src/madrid_twin/eval/tracking.py" = ["PLC0415"]
 "src/madrid_twin/predict/stgnn.py" = ["PLC0415"]
+"src/madrid_twin/predict/stgnn_pignn.py" = ["PLC0415"]
 "src/madrid_twin/control/spaces.py" = ["PLC0415"]
 "src/madrid_twin/control/env.py" = ["PLC0415"]
 "src/madrid_twin/control/train_mappo.py" = ["PLC0415"]
+"src/madrid_twin/sim/runner.py" = ["PLC0415"]
 
 [tool.ruff.format]
 quote-style = "double"

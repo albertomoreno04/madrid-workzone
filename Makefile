@@ -71,6 +71,10 @@ fit-baselines: ## Phase 2: fit forecaster baselines on synthetic data; write a r
 smoke-control: ## Phase 3: roll out baselines on the mock queue env; write a smoke report.
 	$(PYTHON) -m scripts.smoke_control
 
+.PHONY: calibrate-od
+calibrate-od: ## Phase 4: W-SPSA OD calibration on synthetic data; write a report.
+	$(PYTHON) -m scripts.calibrate_od
+
 .PHONY: mlflow-ui
 mlflow-ui: ## Launch the local MLflow UI on http://localhost:5000.
 	$(PYTHON) -m mlflow ui \
