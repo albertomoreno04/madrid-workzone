@@ -1,4 +1,23 @@
-"""Madrid Ayuntamiento open-data clients."""
+"""Madrid Ayuntamiento open-data clients.
+
+The live ``informo.madrid.es/informo/tmadrid/pm.xml`` feed is richer than
+a textbook traffic-detector dump: each ``<pm>`` element carries the
+detector identifier (``<idelem>``), a human-readable description
+(``<descripcion>``), the current intensity / occupancy / load
+(``<intensidad>``, ``<ocupacion>``, ``<carga>``), the saturation /
+capacity intensity (``<intensidadSat>``), a level-of-service code
+(``<nivelServicio>``), an error flag (``<error>`` = ``N`` or ``Y``), an
+administrative subarea, and **UTM coordinates** (``<st_x>``, ``<st_y>``
+in EPSG:25830). A single ``<fecha_hora>`` element at the root of
+``<pms>`` carries the snapshot timestamp and applies to every detector
+in that snapshot.
+
+:class:`DetectorReading` captures all of those fields. The capacity and
+coordinate fields are essential for the Phase 4 W-SPSA calibration —
+they let us geolocate detectors to network edges without a separate
+location feed, and they give us per-detector capacities for the
+count-matching loss denominators.
+"""
 
 from __future__ import annotations
 
@@ -35,14 +54,36 @@ DEFAULT_RETRY_BACKOFF_S: float = 1.5
 
 @dataclass(frozen=True)
 class DetectorReading:
-    """One detector's snapshot from the real-time intensity feed."""
+    """One detector's snapshot from the real-time intensity feed.
+
+    The first six fields existed in the v0.1 parser; the remainder were
+    added once we discovered the live feed is far richer than the
+    initial test fixture suggested. All new fields default to ``None``
+    so older / minimal XMLs still parse cleanly.
+    """
 
     detector_id: str
     timestamp: datetime | None
     intensity_veh_h: float | None
     occupancy_pct: float | None
     load_pct: float | None
+    # In the live feed this is derived from <error>: 'N' -> '0' (healthy),
+    # 'Y' -> '1' (failure). In legacy fixtures it can come directly from
+    # <st_intensidad>.
     service_status: str | None
+
+    description: str | None = None
+    # Saturation intensity / per-detector capacity, veh/h. Used directly
+    # as the denominator in the W-SPSA count-matching loss.
+    intensity_sat_veh_h: float | None = None
+    # Level-of-service code reported by the operator (e.g. "0" through "3").
+    service_level: str | None = None
+    # Administrative subarea string used by the Ayuntamiento for grouping.
+    subarea: str | None = None
+    # UTM coordinates (EPSG:25830, the official CRS for peninsular Spain).
+    # Lets us snap detectors to SUMO edges without a separate location feed.
+    x_utm: float | None = None
+    y_utm: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -51,7 +92,7 @@ class DetectorReading:
 
 
 # ---------------------------------------------------------------------------
-# Parsing.
+# Parsing helpers.
 # ---------------------------------------------------------------------------
 
 
@@ -69,6 +110,7 @@ def _parse_madrid_timestamp(raw: str | None) -> datetime | None:
 
 
 def _maybe_float(raw: str | None) -> float | None:
+    """Parse a numeric field, tolerating Spanish decimal commas."""
     if raw is None or raw.strip() == "":
         return None
     try:
@@ -77,12 +119,62 @@ def _maybe_float(raw: str | None) -> float | None:
         return None
 
 
+def _maybe_str(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    return stripped if stripped else None
+
+
+def _error_flag_to_status(error_flag: str | None) -> str | None:
+    """Map the Ayuntamiento ``<error>`` value to our service-status code.
+
+    ``N`` (no error) becomes ``"0"`` (healthy), ``Y`` (error) becomes
+    ``"1"`` (failure). Any other value — empty, missing, garbled — yields
+    ``None`` so callers fall back to legacy fields.
+    """
+    if not error_flag:
+        return None
+    f = error_flag.strip().upper()
+    if f == "N":
+        return "0"
+    if f == "Y":
+        return "1"
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Parsing.
+# ---------------------------------------------------------------------------
+
+
 def parse_traffic_intensity_xml(xml_text: str) -> list[DetectorReading]:
-    """Parse the Ayuntamiento real-time XML into typed detector readings."""
+    """Parse the Ayuntamiento real-time XML into typed detector readings.
+
+    Handles both XML shapes seen in the wild:
+
+    - The **live feed** at ``informo.madrid.es/informo/tmadrid/pm.xml``:
+      one ``<fecha_hora>`` at the root that applies to all ``<pm>``
+      children, ``<error>`` flag per detector, plus ``<descripcion>``,
+      ``<intensidadSat>``, ``<nivelServicio>``, ``<subarea>``, ``<st_x>``
+      and ``<st_y>``.
+    - **Legacy / fixture** XMLs with per-``<pm>`` ``<fecha_hora>`` and
+      ``<st_intensidad>`` as the health flag.
+
+    A per-``<pm>`` ``<fecha_hora>`` takes precedence over the root one
+    when both are present. ``<error>`` takes precedence over
+    ``<st_intensidad>`` for the same reason.
+    """
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
         raise ValueError(f"Malformed traffic-intensity XML: {exc}") from exc
+
+    # Snapshot-wide timestamp from the root, if present.
+    root_fecha_hora_el = root.find("fecha_hora")
+    root_timestamp = _parse_madrid_timestamp(
+        root_fecha_hora_el.text if root_fecha_hora_el is not None else None
+    )
 
     readings: list[DetectorReading] = []
     candidates = list(root.iter("pm"))
@@ -93,14 +185,31 @@ def parse_traffic_intensity_xml(xml_text: str) -> list[DetectorReading]:
         detector_id = (pm.findtext("idelem") or pm.findtext("id") or "").strip()
         if not detector_id:
             continue
+
+        # Timestamp resolution: prefer per-pm, fall back to root.
+        per_pm_timestamp = _parse_madrid_timestamp(pm.findtext("fecha_hora"))
+        timestamp = per_pm_timestamp or root_timestamp
+
+        # Health flag: prefer <error>, fall back to legacy <st_intensidad>.
+        error_flag = _maybe_str(pm.findtext("error"))
+        status_from_error = _error_flag_to_status(error_flag)
+        legacy_status = _maybe_str(pm.findtext("st_intensidad"))
+        service_status = status_from_error if status_from_error is not None else legacy_status
+
         readings.append(
             DetectorReading(
                 detector_id=detector_id,
-                timestamp=_parse_madrid_timestamp(pm.findtext("fecha_hora")),
+                timestamp=timestamp,
                 intensity_veh_h=_maybe_float(pm.findtext("intensidad")),
                 occupancy_pct=_maybe_float(pm.findtext("ocupacion")),
                 load_pct=_maybe_float(pm.findtext("carga")),
-                service_status=(pm.findtext("st_intensidad") or "").strip() or None,
+                service_status=service_status,
+                description=_maybe_str(pm.findtext("descripcion")),
+                intensity_sat_veh_h=_maybe_float(pm.findtext("intensidadSat")),
+                service_level=_maybe_str(pm.findtext("nivelServicio")),
+                subarea=_maybe_str(pm.findtext("subarea")),
+                x_utm=_maybe_float(pm.findtext("st_x")),
+                y_utm=_maybe_float(pm.findtext("st_y")),
             )
         )
 

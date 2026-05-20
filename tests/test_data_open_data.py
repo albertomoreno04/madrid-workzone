@@ -22,18 +22,11 @@ from madrid_twin.data.open_data import (
     parse_traffic_intensity_xml,
 )
 
-# ---------------------------------------------------------------------------
-# Sample payloads.
-# ---------------------------------------------------------------------------
-
-# The XML used by most tests in this module is provided by the
-# ``traffic_intensity_sample_xml`` fixture defined in ``conftest.py``. The
-# malformed one is local to this file.
 MALFORMED_XML = "<pms><pm><idelem>3501</idelem></pm" + "<<<malformed"
 
 
 # ---------------------------------------------------------------------------
-# parse_traffic_intensity_xml()
+# parse_traffic_intensity_xml() — legacy fixture shape.
 # ---------------------------------------------------------------------------
 
 
@@ -72,6 +65,84 @@ class TestParse:
     def test_empty_pms_returns_empty_list(self) -> None:
         readings = parse_traffic_intensity_xml("<pms></pms>")
         assert readings == []
+
+
+# ---------------------------------------------------------------------------
+# parse_traffic_intensity_xml() — live-feed-shaped fixture.
+# ---------------------------------------------------------------------------
+
+
+class TestParseLiveFeed:
+    def test_extracts_all_detectors(self, real_traffic_intensity_sample_xml: str) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        assert len(readings) == 3
+        assert {r.detector_id for r in readings} == {"9841", "9842", "9999"}
+
+    def test_root_fecha_hora_propagates_to_all_readings(
+        self, real_traffic_intensity_sample_xml: str
+    ) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        expected = datetime(2026, 5, 20, 12, 50, 19)
+        for r in readings:
+            assert r.timestamp == expected
+
+    def test_error_flag_N_maps_to_healthy(self, real_traffic_intensity_sample_xml: str) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        d1 = next(r for r in readings if r.detector_id == "9841")
+        assert d1.service_status == "0"
+
+    def test_error_flag_Y_maps_to_failure(self, real_traffic_intensity_sample_xml: str) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        broken = next(r for r in readings if r.detector_id == "9999")
+        assert broken.service_status == "1"
+        assert broken.intensity_veh_h is None  # also empty in the fixture
+
+    def test_description_extracted(self, real_traffic_intensity_sample_xml: str) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        d1 = next(r for r in readings if r.detector_id == "9841")
+        assert d1.description == "Valle de Mena S-E - Acc.Ramon Castroviejo"
+
+    def test_saturation_intensity_extracted(self, real_traffic_intensity_sample_xml: str) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        d1 = next(r for r in readings if r.detector_id == "9841")
+        assert d1.intensity_sat_veh_h == 3100.0
+
+    def test_service_level_extracted(self, real_traffic_intensity_sample_xml: str) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        d1 = next(r for r in readings if r.detector_id == "9841")
+        assert d1.service_level == "0"
+
+    def test_subarea_extracted(self, real_traffic_intensity_sample_xml: str) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        d1 = next(r for r in readings if r.detector_id == "9841")
+        assert d1.subarea == "0328"
+
+    def test_utm_coordinates_extracted_with_spanish_decimals(
+        self, real_traffic_intensity_sample_xml: str
+    ) -> None:
+        readings = parse_traffic_intensity_xml(real_traffic_intensity_sample_xml)
+        d1 = next(r for r in readings if r.detector_id == "9841")
+        # The fixture uses Spanish decimal commas; the parser must
+        # convert them to floats.
+        assert d1.x_utm == pytest.approx(438339.375874991)
+        assert d1.y_utm == pytest.approx(4480454.96970565)
+
+    def test_per_pm_fecha_hora_overrides_root(self) -> None:
+        # When both root and per-pm timestamps are present, the per-pm
+        # one wins. (Defensive in case a future feed format inverts the
+        # convention.)
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <pms>
+          <fecha_hora>01/01/2026 00:00:00</fecha_hora>
+          <pm>
+            <idelem>1</idelem>
+            <fecha_hora>02/02/2026 12:34:56</fecha_hora>
+            <intensidad>100</intensidad>
+            <error>N</error>
+          </pm>
+        </pms>"""
+        readings = parse_traffic_intensity_xml(xml)
+        assert readings[0].timestamp == datetime(2026, 2, 2, 12, 34, 56)
 
 
 # ---------------------------------------------------------------------------

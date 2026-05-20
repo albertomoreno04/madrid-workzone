@@ -38,6 +38,9 @@ STATISTICS_XML = """\
 </statistics>
 """
 
+# Minimal / legacy-shaped fixture: per-<pm> timestamps, <st_intensidad>
+# as the health flag. Kept verbatim because earlier tests assert against
+# its specific values.
 TRAFFIC_INTENSITY_SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <pms>
   <pm>
@@ -67,11 +70,69 @@ TRAFFIC_INTENSITY_SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 </pms>
 """
 
+# Real-feed-shaped fixture: snapshot-wide <fecha_hora> at the root,
+# <error>N|Y</error> as the health flag, and the rich detector
+# metadata (descripcion, intensidadSat, nivelServicio, subarea, st_x, st_y).
+# Mirrors the actual informo.madrid.es/informo/tmadrid/pm.xml structure.
+REAL_TRAFFIC_INTENSITY_SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<pms>
+  <fecha_hora>20/05/2026 12:50:19</fecha_hora>
+  <pm>
+    <idelem>9841</idelem>
+    <descripcion>Valle de Mena S-E - Acc.Ramon Castroviejo</descripcion>
+    <accesoAsociado>0301005</accesoAsociado>
+    <intensidad>400</intensidad>
+    <ocupacion>3</ocupacion>
+    <carga>16</carga>
+    <nivelServicio>0</nivelServicio>
+    <intensidadSat>3100</intensidadSat>
+    <error>N</error>
+    <subarea>0328</subarea>
+    <st_x>438339,375874991</st_x>
+    <st_y>4480454,96970565</st_y>
+  </pm>
+  <pm>
+    <idelem>9842</idelem>
+    <descripcion>Valle de Mena N-O - Acc.Ramon Castroviejo</descripcion>
+    <accesoAsociado>0301006</accesoAsociado>
+    <intensidad>240</intensidad>
+    <ocupacion>2</ocupacion>
+    <carga>11</carga>
+    <nivelServicio>0</nivelServicio>
+    <intensidadSat>3100</intensidadSat>
+    <error>N</error>
+    <subarea>0328</subarea>
+    <st_x>438345,5</st_x>
+    <st_y>4480460,8</st_y>
+  </pm>
+  <pm>
+    <idelem>9999</idelem>
+    <descripcion>Broken detector</descripcion>
+    <accesoAsociado>0999999</accesoAsociado>
+    <intensidad></intensidad>
+    <ocupacion></ocupacion>
+    <carga></carga>
+    <nivelServicio>0</nivelServicio>
+    <intensidadSat>3100</intensidadSat>
+    <error>Y</error>
+    <subarea>0999</subarea>
+    <st_x>0</st_x>
+    <st_y>0</st_y>
+  </pm>
+</pms>
+"""
+
 
 @pytest.fixture()
 def traffic_intensity_sample_xml() -> str:
-    """Shared XML payload mirroring the Ayuntamiento real-time feed."""
+    """Shared XML payload mirroring the legacy fixture format."""
     return TRAFFIC_INTENSITY_SAMPLE_XML
+
+
+@pytest.fixture()
+def real_traffic_intensity_sample_xml() -> str:
+    """Shared XML payload mirroring the live Ayuntamiento feed format."""
+    return REAL_TRAFFIC_INTENSITY_SAMPLE_XML
 
 
 @pytest.fixture()
