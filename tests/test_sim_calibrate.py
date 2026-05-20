@@ -37,9 +37,7 @@ class TestCountMatchingLoss:
 
     def test_negative_weights_raise(self) -> None:
         with pytest.raises(ValueError):
-            count_matching_loss(
-                np.zeros(2), np.zeros(2), weights=np.array([1.0, -1.0])
-            )
+            count_matching_loss(np.zeros(2), np.zeros(2), weights=np.array([1.0, -1.0]))
 
 
 class TestWSPSAConfig:
@@ -65,9 +63,7 @@ class TestWSPSA:
         # Final loss must be substantially below initial loss.
         assert report.final_loss < 0.5 * report.initial_loss
         # We should have moved meaningfully toward the target.
-        assert float(np.linalg.norm(theta_star - target)) < float(
-            np.linalg.norm(theta0 - target)
-        )
+        assert float(np.linalg.norm(theta_star - target)) < float(np.linalg.norm(theta0 - target))
 
     def test_records_trace(self) -> None:
         target = np.array([1.0])
