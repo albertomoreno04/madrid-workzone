@@ -121,7 +121,7 @@ def build_network_from_osm(
         str(output_net),
         "--keep-edges.by-vclass",
         "passenger",
-        "--type-files.keep",
+        "--keep-edges.by-type",
         ",".join(road_types),
         # Geometry / topology cleanups that consistently improve quality.
         "--remove-edges.isolated",
@@ -136,9 +136,6 @@ def build_network_from_osm(
         "--tls.discard-simple",
         "true",
         "--junctions.join",
-        "true",
-        # Disable progress noise.
-        "--no-step-log",
         "true",
         *extra_args,
     ]

@@ -76,7 +76,7 @@ class TestBuildNetwork:
         assert "--output-file" in cmd
         assert str(out) in cmd
         # All default road types should appear comma-joined.
-        types_index = cmd.index("--type-files.keep") + 1
+        types_index = cmd.index("--keep-edges.by-type") + 1
         assert "highway.motorway" in cmd[types_index]
         for road_type in DEFAULT_ROAD_TYPES:
             assert road_type in cmd[types_index]
