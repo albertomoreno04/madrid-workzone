@@ -63,6 +63,14 @@ baseline-metrics: ## Compute baseline metrics from a SUMO output bundle.
 probe: ## Hit the Madrid Ayuntamiento traffic intensity feed; save a snapshot.
 	$(PYTHON) -m scripts.probe_open_data
 
+.PHONY: audit-detectors
+audit-detectors: ## Week 1: detector reliability over accumulated probe snapshots.
+	$(PYTHON) -m scripts.audit_detectors
+
+.PHONY: build-network
+build-network: ## Week 1: convert the Madrid OSM extract into a SUMO net.xml.
+	$(PYTHON) -m scripts.build_madrid_network
+
 .PHONY: fit-baselines
 fit-baselines: ## Phase 2: fit forecaster baselines on synthetic data; write a report.
 	$(PYTHON) -m scripts.fit_baselines

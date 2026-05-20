@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from madrid_twin.data.audit import (
+    AuditConfig,
+    DetectorReliability,
+    aggregate_snapshots,
+    filter_usable_detectors,
+    load_snapshot_files,
+    write_audit_outputs,
+)
 from madrid_twin.data.open_data import (
     TRAFFIC_INTENSITY_URL,
     DetectorReading,
@@ -12,10 +20,16 @@ from madrid_twin.data.open_data import (
 )
 
 __all__ = [
-    "TRAFFIC_INTENSITY_URL",
+    "AuditConfig",
     "DetectorReading",
+    "DetectorReliability",
+    "TRAFFIC_INTENSITY_URL",
+    "aggregate_snapshots",
     "fetch_traffic_intensity",
     "fetch_traffic_intensity_xml",
+    "filter_usable_detectors",
     "filter_valid_readings",
+    "load_snapshot_files",
     "parse_traffic_intensity_xml",
+    "write_audit_outputs",
 ]
