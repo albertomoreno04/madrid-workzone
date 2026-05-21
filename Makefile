@@ -79,6 +79,10 @@ snap-detectors: ## Week 2: snap usable detectors to their nearest SUMO edges.
 emit-edgedata: ## Week 2: emit a sumo-gui edgeData XML from the latest snapshot.
 	$(PYTHON) -m scripts.emit_edgedata
 
+.PHONY: build-taz
+build-taz: ## Week 2: decompose the network into Traffic Analysis Zones via K-means.
+	$(PYTHON) -m scripts.build_taz
+
 .PHONY: fit-baselines
 fit-baselines: ## Phase 2: fit forecaster baselines on synthetic data; write a report.
 	$(PYTHON) -m scripts.fit_baselines

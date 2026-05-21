@@ -105,6 +105,18 @@ class TestAggregate:
         obs = aggregate_observations_by_edge(readings, mapping)
         assert obs == {}
 
+    def test_negative_intensity_sentinel_is_dropped(self) -> None:
+        # The Ayuntamiento occasionally reports -1 as "no data" rather
+        # than leaving the field empty. Don't let it contaminate averages.
+        readings = [
+            _reading("d1", intensity=500.0),
+            _reading("d2", intensity=-1.0),
+        ]
+        mapping = {"d1": "e1", "d2": "e1"}
+        obs = aggregate_observations_by_edge(readings, mapping)
+        assert obs["e1"].intensity_veh_h == 500.0
+        assert obs["e1"].n_detectors == 1
+
 
 # ---------------------------------------------------------------------------
 # edgedata_to_xml()

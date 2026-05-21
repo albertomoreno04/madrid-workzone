@@ -110,6 +110,7 @@ ignore = ["PLR0913", "PLR0915", "PLR2004"]
 "src/madrid_twin/control/train_mappo.py" = ["PLC0415"]
 "src/madrid_twin/sim/runner.py" = ["PLC0415"]
 "src/madrid_twin/sim/snap.py" = ["PLC0415"]
+"src/madrid_twin/sim/taz.py" = ["PLC0415"]
 
 [tool.ruff.format]
 quote-style = "double"

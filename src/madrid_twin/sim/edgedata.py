@@ -94,9 +94,12 @@ def aggregate_observations_by_edge(
             continue
         # Only healthy detectors with an intensity contribute. Otherwise
         # the aggregate would mix observed flow with sensor failures.
+        # The Ayuntamiento feed occasionally uses -1 as a "no data"
+        # sentinel rather than leaving <intensidad> empty; treat those
+        # as missing too.
         if r.service_status not in (None, "", "0"):
             continue
-        if r.intensity_veh_h is None:
+        if r.intensity_veh_h is None or r.intensity_veh_h < 0:
             continue
 
         bucket = buckets.setdefault(
