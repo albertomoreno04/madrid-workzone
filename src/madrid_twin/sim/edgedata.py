@@ -29,7 +29,6 @@ from xml.etree import ElementTree as ET
 
 from madrid_twin.data.open_data import DetectorReading
 
-
 # ---------------------------------------------------------------------------
 # Data classes.
 # ---------------------------------------------------------------------------

@@ -83,6 +83,10 @@ emit-edgedata: ## Week 2: emit a sumo-gui edgeData XML from the latest snapshot.
 build-taz: ## Week 2: decompose the network into Traffic Analysis Zones via K-means.
 	$(PYTHON) -m scripts.build_taz
 
+.PHONY: build-od-prior
+build-od-prior: ## Week 2: build a gravity-model OD prior for W-SPSA.
+	$(PYTHON) -m scripts.build_od_prior
+
 .PHONY: fit-baselines
 fit-baselines: ## Phase 2: fit forecaster baselines on synthetic data; write a report.
 	$(PYTHON) -m scripts.fit_baselines
