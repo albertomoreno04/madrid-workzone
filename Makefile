@@ -71,6 +71,14 @@ audit-detectors: ## Week 1: detector reliability over accumulated probe snapshot
 build-network: ## Week 1: convert the Madrid OSM extract into a SUMO net.xml.
 	$(PYTHON) -m scripts.build_madrid_network
 
+.PHONY: snap-detectors
+snap-detectors: ## Week 2: snap usable detectors to their nearest SUMO edges.
+	$(PYTHON) -m scripts.snap_detectors
+
+.PHONY: emit-edgedata
+emit-edgedata: ## Week 2: emit a sumo-gui edgeData XML from the latest snapshot.
+	$(PYTHON) -m scripts.emit_edgedata
+
 .PHONY: fit-baselines
 fit-baselines: ## Phase 2: fit forecaster baselines on synthetic data; write a report.
 	$(PYTHON) -m scripts.fit_baselines
